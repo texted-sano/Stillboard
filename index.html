@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stillboard Copy｜キャッチコピー生成</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✒</text></svg>">
+<style>
+/* ===== TOKENS ===== */
+:root {
+  --bg: #e9e9e9;
+  --surface: #f5f5f5;
+  --surface-2: #ffffff;
+  --head: #e1e1e1;
+  --ink: #2c2c2c;
+  --muted: #5a5a5a;
+  --line: #d0d0d0;
+  --line-strong: #a8a8a8;
+  --control: #ffffff;
+  --control-hover: #ececec;
+  --accent: #0d66d0;
+  --accent-hover: #0a58b5;
+  --on-accent: #ffffff;
+  --accent-text: #0d66d0;
+  --accent-soft: #dde9f8;
+  --on-accent-soft: #0a4a99;
+  --lamp: #e68619;
+  --danger: #c9252d;
+  --danger-soft: #fbe6e6;
+  --ok: #268e6c;
+  --ok-soft: #e1f2ea;
+  --warn-soft: #fdf0dc;
+  --on-warn-soft: #5c3a00;
+  --log-bg: #1b1b1b;
+  --log-ink: #d6d6d6;
+  --radius-s: 4px;
+  --radius-l: 6px;
+  --h-control: 28px;
+  --run-height: 36px;
+  --topbar-h: 40px;
+  --font: "Source Han Sans JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1b1b;
+    --surface: #2c2c2c;
+    --surface-2: #232323;
+    --head: #252525;
+    --ink: #e8e8e8;
+    --muted: #ababab;
+    --line: #3e3e3e;
+    --line-strong: #5a5a5a;
+    --control: #383838;
+    --control-hover: #454545;
+    --accent-hover: #1473e6;
+    --accent-text: #5aa9fa;
+    --accent-soft: #1d3554;
+    --on-accent-soft: #cfe3fb;
+    --lamp: #f0a63a;
+    --danger: #ff8a8a;
+    --danger-soft: #3d1c1c;
+    --ok: #6fd6a8;
+    --ok-soft: #173329;
+    --warn-soft: #3a2c10;
+    --on-warn-soft: #ffe0a8;
+    --log-bg: #121212;
+    color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body { margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 13px; line-height: 1.5; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+[hidden] { display: none !important; }
+
+/* ===== CONTROLS ===== */
+button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--h-control);
+  border: 1px solid var(--line-strong); background: var(--control); color: var(--ink);
+  border-radius: var(--radius-s); padding: 3px 12px; cursor: pointer; font-size: 12px; font-weight: 500; line-height: 1.3;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+button:hover:not(:disabled) { background: var(--control-hover); border-color: var(--muted); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary, button.run { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+button.primary:hover:not(:disabled), button.run:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--on-accent); }
+button.quiet { border-color: transparent; background: transparent; }
+button.quiet:hover:not(:disabled) { background: var(--control-hover); border-color: transparent; }
+button.big { width: 100%; font-size: 14px; letter-spacing: .06em; }
+button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+button.danger:hover:not(:disabled) { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+button.small { min-height: 22px; padding: 0 8px; font-size: 11px; }
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%; min-height: var(--h-control); background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s); padding: 3px 8px; font-size: 13px; transition: border-color .12s;
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: var(--muted); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent-text); outline: none; box-shadow: 0 0 0 1px var(--accent-text); }
+textarea { resize: vertical; line-height: 1.55; padding: 6px 8px; }
+textarea.autogrow { resize: none; overflow-y: hidden; min-height: var(--h-control); line-height: 1.5; padding-top: 4px; padding-bottom: 4px; }
+textarea.code { font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+label.field { display: block; font-size: 12px; color: var(--muted); }
+label.field > input, label.field > select, label.field > textarea { margin-top: 3px; color: var(--ink); }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.row > .grow { flex: 1 1 200px; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.note:empty { display: none; }
+.msg { font-size: 12px; margin: 0; white-space: pre-wrap; }
+.msg:empty { display: none; }
+.msg.ok { color: var(--ok); }
+.msg.err { color: var(--danger); }
+code { background: var(--surface-2); border: 1px solid var(--line); padding: 0 5px; border-radius: 3px; font-size: 12px; font-family: var(--mono); }
+details > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 4px 0;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted);
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before {
+  content: ""; width: 0; height: 0; flex: none; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .12s;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+
+/* ===== APP SHELL ===== */
+.topbar {
+  flex: none; height: var(--topbar-h); display: flex; align-items: center; gap: 6px; padding: 0 10px;
+  background: var(--head); border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 14px; margin: 0 6px 0 2px; font-weight: 700; letter-spacing: .04em; display: flex; align-items: center; gap: 8px; }
+.topbar h1::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--lamp); }
+.pills { display: flex; gap: 4px; margin-left: auto; }
+.pill { min-height: 24px; font-size: 12px; border-radius: 999px; padding: 1px 10px; background: transparent; border-color: var(--line); white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.pill[data-state="ok"]::before { background: var(--ok); }
+.pill[data-state="down"]::before { background: var(--danger); }
+.layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 1px; background: var(--line); }
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  body { overflow: visible; }
+  .layout { grid-template-columns: 1fr; grid-template-rows: none; }
+  .side-scroll, .col-output { overflow: visible; }
+}
+
+/* ===== SIDE PANEL ===== */
+.col-input { background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+.side-scroll { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.psec { border-bottom: 1px solid var(--line); }
+.psec-title { margin: 0; padding: 5px 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); background: var(--head); border-bottom: 1px solid var(--line); }
+.psec-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.prop { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: center; margin: 0; }
+.prop-top { align-items: start; }
+.prop-top .prop-label { padding-top: 5px; }
+.prop-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.adv-open { width: 100%; justify-content: flex-start; gap: 8px; background: var(--surface-2); }
+.adv-arrow { margin-left: auto; font-size: 16px; color: var(--muted); }
+.side-foot { flex: none; padding: 8px 10px; background: var(--head); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.run-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px; }
+.run-row select, .run-row button.big { height: var(--run-height); margin: 0; }
+.side-foot .note { font-size: 11px; }
+
+/* ===== OUTPUT ===== */
+.col-output { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; background: var(--bg); }
+.panel { background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+.panel-head { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 2px 10px; background: var(--head); border-bottom: 1px solid var(--line); }
+.panel-head h2 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); }
+.head-count { font-weight: 500; letter-spacing: 0; margin-left: 4px; }
+.head-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.panel-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.status-panel { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.status-head { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.progress { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.progress > div { height: 100%; width: 0; background: var(--lamp); transition: width .4s; }
+.progress.busy > div {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, .6), transparent);
+  background-size: 60px 100%; background-repeat: no-repeat; animation: shimmer 1.3s linear infinite;
+}
+@keyframes shimmer { from { background-position: -60px 0; } to { background-position: calc(100% + 60px) 0; } }
+.overall-pct { font-size: 11px; font-weight: 700; color: var(--muted); min-width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; }
+#cancel { min-height: 24px; padding: 1px 10px; }
+.verdict { margin: 0; padding: 6px 10px; border-radius: var(--radius-s); font-size: 13px; font-weight: 700; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); white-space: pre-wrap; }
+.verdict[data-state="ok"] { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.verdict[data-state="ng"] { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.verdict[data-state="running"] { background: var(--warn-soft); border-color: var(--lamp); color: var(--on-warn-soft); }
+.copies { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .copies { grid-template-columns: 1fr; } }
+.copy { border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: var(--radius-s); background: var(--surface-2); padding: 6px 10px 8px; }
+.copy[data-ok="false"] { border-left-color: var(--danger); }
+.copy-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.copy-num { font-size: 12px; font-weight: 700; }
+.copy-badge { font-size: 11px; font-weight: 700; border-radius: 3px; padding: 0 6px; background: var(--ok-soft); color: var(--ok); }
+.copy[data-ok="false"] .copy-badge { background: var(--danger-soft); color: var(--danger); }
+.copy-head button { margin-left: auto; }
+.copy-line { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 8px; font-size: 14px; line-height: 1.7; }
+.copy-line .len { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; padding-top: 3px; font-variant-numeric: tabular-nums; }
+.copy-line .len.bad { color: var(--danger); font-weight: 700; }
+.copy-text { -webkit-user-select: text; user-select: text; }
+.copy-errors { margin: 6px 0 0; padding: 4px 8px 4px 22px; font-size: 12px; color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-s); }
+.empty { grid-column: 1 / -1; color: var(--muted); padding: 32px 0; text-align: center; font-size: 12px; }
+.log { margin: 0; font-family: var(--mono); font-size: 12px; background: var(--log-bg); color: var(--log-ink); border-radius: var(--radius-s); padding: 8px 10px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+.log:empty::before { content: "まだ記録はありません"; color: #888; }
+
+/* ===== SETTINGS DIALOG ===== */
+dialog#settings {
+  width: min(980px, 100vw - 24px); height: min(760px, 100dvh - 24px); max-width: none; max-height: none;
+  padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-l); background: var(--surface); color: var(--ink); overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+}
+dialog#settings[open] { display: flex; flex-direction: column; }
+dialog#settings::backdrop { background: rgba(0, 0, 0, .55); }
+.dlg-head { flex: none; display: flex; align-items: center; padding: 4px 6px 4px 14px; min-height: 36px; border-bottom: 1px solid var(--line); background: var(--head); }
+.dlg-head h2 { margin: 0; font-size: 13px; }
+.dlg-head button { margin-left: auto; }
+.dlg-foot { flex: none; display: flex; gap: 10px; align-items: center; justify-content: flex-end; padding: 5px 14px; border-top: 1px solid var(--line); background: var(--head); font-size: 12px; color: var(--muted); }
+.dlg-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 180px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.tabs { border-right: 1px solid var(--line); padding: 6px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; background: var(--head); }
+.tab-group { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); padding: 8px 8px 2px; }
+.tab-group:first-child { padding-top: 2px; }
+.tab-group:not(:first-child) { border-top: 1px solid var(--line-strong); margin-top: 6px; padding-top: 8px; }
+.tabs button { justify-content: flex-start; border: 1px solid transparent; text-align: left; background: none; padding: 3px 8px; font-size: 13px; }
+.tabs button:hover:not(:disabled) { background: var(--control-hover); border-color: transparent; }
+.tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.pane { padding: 14px 16px 16px; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 700px) {
+  .dlg-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .tabs { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--line); }
+  .tab-group { display: none; }
+  .tabs button { flex: none; }
+  .pane { padding: 12px; }
+}
+.pane-head h3 { margin: 0 0 2px; font-size: 16px; }
+.lead { margin: 0; font-size: 12px; color: var(--muted); max-width: 80ch; }
+.card { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+.card-title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; font-weight: 700; }
+.card-title .badge { font-size: 11px; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; }
+.card-title button { margin-left: auto; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 0; font-size: 12px; }
+.kv dt { font-family: var(--mono); font-weight: 700; }
+.kv dd { margin: 0; color: var(--muted); }
+.inline-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: end; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+.preview { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.6; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; max-height: 420px; overflow: auto; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
+.preview:empty { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .progress.busy > div { animation: none; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1>Stillboard Copy</h1>
+  <div class="pills">
+    <button class="pill" id="pill-llm" data-state="idle">文章AI: 確認中</button>
+  </div>
+  <button class="quiet" id="open-settings">設定</button>
+</header>
+
+<main class="layout">
+  <aside class="col-input" aria-label="入力">
+    <div class="side-scroll">
+      <section class="psec" aria-labelledby="theme-title">
+        <h2 class="psec-title" id="theme-title">テーマ</h2>
+        <div class="psec-body">
+          <label class="prop"><span class="prop-label">季節・時期</span><input type="text" id="season" placeholder="例：晩夏、残暑"></label>
+          <label class="prop"><span class="prop-label">衣装</span><input type="text" id="costume" placeholder="例：ビキニ、水着"></label>
+          <label class="prop"><span class="prop-label">キーワード</span><input type="text" id="keywords" placeholder="例：ラストサマー（「、」で複数）"></label>
+          <label class="prop"><span class="prop-label">雰囲気</span><input type="text" id="mood" placeholder="例：艶やか、大胆"></label>
+          <label class="prop prop-top"><span class="prop-label">追加の指示</span><textarea id="extraNote" class="autogrow" rows="1" placeholder="任意。例：「復刻」企画であることが伝わるように"></textarea></label>
+        </div>
+      </section>
+
+      <section class="psec" aria-labelledby="engine-title">
+        <h2 class="psec-title" id="engine-title">生成</h2>
+        <div class="psec-body">
+          <label class="prop"><span class="prop-label">文章AI</span><select id="model" aria-label="文章AIのモデル"></select></label>
+          <label class="prop"><span class="prop-label">最大回数</span><input type="number" id="maxRounds" min="1" max="30" aria-label="LLMとのやり取りの最大回数"></label>
+          <p class="note">NGの案が残っていても、この回数のやり取りで打ち切ります。</p>
+          <button class="adv-open" id="open-prompts" aria-haspopup="dialog"><span>プロンプト・詳しい設定</span><span class="adv-arrow" aria-hidden="true">›</span></button>
+        </div>
+      </section>
+    </div>
+    <div class="side-foot">
+      <div class="run-row">
+        <select id="count" aria-label="作成する案の数"></select>
+        <button class="run big" id="run">実行</button>
+      </div>
+      <p class="note">指定した数の案がすべてチェックを通るまで、LLMに修正させます。</p>
+    </div>
+  </aside>
+
+  <section class="col-output">
+    <div class="panel status-panel">
+      <div class="status-head">
+        <div class="progress" id="progress"><div id="progress-bar"></div></div>
+        <span class="overall-pct" id="progress-pct">0 / 0</span>
+        <button class="danger" id="cancel" hidden>中止</button>
+      </div>
+      <p class="verdict" id="verdict" data-state="idle"></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>キャッチコピー<span class="head-count" id="copies-count"></span></h2>
+        <div class="head-tools"><button id="copy-all" disabled>OKの案をすべてコピー</button></div>
+      </div>
+      <div class="panel-body"><div class="copies" id="copies"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-body">
+        <details id="log-box" open>
+          <summary>処理の記録</summary>
+          <pre class="log" id="log"></pre>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="settings" aria-labelledby="settings-title">
+  <div class="dlg-head"><h2 id="settings-title">設定</h2><button id="close-settings">閉じる</button></div>
+  <div class="dlg-body">
+    <nav class="tabs" role="tablist" aria-label="設定の項目">
+      <div class="tab-group" aria-hidden="true">接続</div>
+      <button role="tab" data-pane="llm" aria-selected="true">文章AI</button>
+      <div class="tab-group" aria-hidden="true">プロンプト</div>
+      <button role="tab" data-pane="system">指示（システム）</button>
+      <button role="tab" data-pane="requests">依頼文（生成・修正・校閲）</button>
+      <button role="tab" data-pane="samples">参考サンプル</button>
+      <button role="tab" data-pane="preview">送信内容の確認</button>
+      <div class="tab-group" aria-hidden="true">チェック</div>
+      <button role="tab" data-pane="check">生成・チェック</button>
+    </nav>
+
+    <section class="pane" data-pane="llm">
+      <header class="pane-head"><h3>文章AI</h3><p class="lead">Bionic のローカルAPIサーバーに、このページから直接つなぎます。文章や設定が外部のサーバーに送られることはありません。</p></header>
+      <div class="card">
+        <h4 class="card-title">準備（最初の1回だけ）</h4>
+        <dl class="kv">
+          <dt>Bionic</dt><dd>設定 →「ローカルモデルAPI」で「ローカルAPIサーバー」と「CORS」をオン</dd>
+          <dt>LM Studio</dt><dd>「Developer」でサーバーを起動し、「Enable CORS」をオン</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h4 class="card-title">接続先</h4>
+        <div class="inline-field">
+          <label class="field">サーバーのURL<input type="text" id="serverUrl"></label>
+          <button id="detect">🔍 自動で探す</button>
+        </div>
+        <div class="row"><button class="primary" id="test-conn">接続を確認</button><p class="msg" id="conn-msg"></p></div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="system" hidden>
+      <header class="pane-head"><h3>指示（システムプロンプト）</h3><p class="lead">LLMの役割・3行の型・守るルールを伝える文です。生成と修正のどちらの依頼にも、毎回この文が付きます。変更は自動で保存されます。</p></header>
+      <div class="card">
+        <h4 class="card-title">指示文<button class="small" data-reset="system">既定の内容に戻す</button></h4>
+        <textarea id="prompt-system" class="code" rows="26" spellcheck="false"></textarea>
+      </div>
+      <div class="card">
+        <h4 class="card-title">使える差し込み</h4>
+        <dl class="kv" id="placeholder-help"></dl>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="requests" hidden>
+      <header class="pane-head"><h3>依頼文（生成・修正・校閲）</h3><p class="lead">指示文のあとに送る依頼文です。「生成」は新しい案を頼むとき、「修正」はチェックでNGになった案を直させるとき、「校閲」はルールのチェックを通った案の日本語を確認させるときに使います（校閲は指示文を付けず、この依頼文だけを送ります）。</p></header>
+      <div class="card">
+        <h4 class="card-title">生成の依頼<button class="small" data-reset="generate">既定の内容に戻す</button></h4>
+        <textarea id="prompt-generate" class="code" rows="11" spellcheck="false"></textarea>
+      </div>
+      <div class="card">
+        <h4 class="card-title">修正の依頼<button class="small" data-reset="fix">既定の内容に戻す</button></h4>
+        <textarea id="prompt-fix" class="code" rows="11" spellcheck="false"></textarea>
+        <p class="note"><code>{{items}}</code> には、NGの案と「直すこと」（行ごとの文字数と、何文字増やす・減らすか）がアプリから自動で入ります。</p>
+      </div>
+      <div class="card">
+        <h4 class="card-title">校閲の依頼（日本語チェック）<button class="small" data-reset="review">既定の内容に戻す</button></h4>
+        <textarea id="prompt-review" class="code" rows="14" spellcheck="false"></textarea>
+        <p class="note"><code>{{items}}</code> には判定する案が「案1」「案2」…の見出し付きで入ります。返答は「案1：OK」「案2：NG 理由」の形で読み取ります。</p>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="samples" hidden>
+      <header class="pane-head"><h3>参考サンプル</h3><p class="lead">実際に採用したキャッチコピーです。3行で1案、案と案の間は空行で区切ります。このうち文字数のルールを満たす案だけが、お手本として指示文の <code>{{samples}}</code> に入ります（毎回順番を入れ替えます）。</p></header>
+      <div class="card">
+        <h4 class="card-title">サンプル<span class="badge" id="samples-count"></span><button class="small" data-reset="samples">既定の内容に戻す</button></h4>
+        <textarea id="prompt-samples" class="code" rows="28" spellcheck="false"></textarea>
+        <p class="note" id="samples-skipped"></p>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="preview" hidden>
+      <header class="pane-head"><h3>送信内容の確認</h3><p class="lead">いまのテーマの入力とプロンプトから、LLMに送る文を組み立てて表示します（サンプルの並び順は実行のたびに変わります）。</p></header>
+      <div class="row"><button class="primary" id="build-preview">いまの入力で組み立てる</button></div>
+      <div class="card">
+        <h4 class="card-title">Claude・ChatGPT などで使う</h4>
+        <p class="note">指示・参考サンプル・今回のテーマ・依頼（左下で選んだ案の数）を1つにまとめたプロンプトを出力します。チャットにそのまま貼り付けて使えます。</p>
+        <div class="row">
+          <button id="copy-external">プロンプトを一括コピー</button>
+          <button id="download-external">mdファイルでダウンロード</button>
+          <p class="msg" id="external-msg"></p>
+        </div>
+      </div>
+      <div class="card">
+        <h4 class="card-title">指示（システム）</h4>
+        <pre class="preview" id="preview-system"></pre>
+      </div>
+      <div class="card">
+        <h4 class="card-title">生成の依頼</h4>
+        <pre class="preview" id="preview-generate"></pre>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="check" hidden>
+      <header class="pane-head"><h3>生成・チェック</h3><p class="lead">LLMの設定と、アプリ側のチェックの設定です。</p></header>
+      <div class="card">
+        <h4 class="card-title">生成</h4>
+        <div class="grid-2">
+          <label class="field">temperature（文のばらつき・0〜2）<input type="number" id="temperature" min="0" max="2" step="0.05"></label>
+          <label class="field">1回の依頼で作る案の数<input type="number" id="batchSize" min="1" max="30"></label>
+        </div>
+        <p class="note">小さいモデルは一度に多くの案を頼むと質が落ちやすいため、数案ずつに分けて依頼します。</p>
+      </div>
+      <div class="card">
+        <h4 class="card-title">日本語チェック</h4>
+        <label class="row"><input type="checkbox" id="review"> ルールのチェックを通った案を、LLMに校閲させる</label>
+        <p class="note">意味が通らない文や、1行目がテーマとつながっていない案をNGにして直させます。LLMとのやり取りが1回増えるぶん、時間がかかります。校閲の依頼文は「依頼文（生成・修正・校閲）」タブで編集できます。</p>
+      </div>
+      <div class="card">
+        <h4 class="card-title">NGワード<button class="small" data-reset="ngWords">既定の内容に戻す</button></h4>
+        <textarea id="ngWords" rows="4"></textarea>
+        <p class="note">「、」区切り。含まれていたら、その案はNGになり修正させます。</p>
+      </div>
+      <div class="card">
+        <h4 class="card-title">アプリ側のチェック内容</h4>
+        <dl class="kv" id="rules-help"></dl>
+      </div>
+    </section>
+  </div>
+  <div class="dlg-foot">変更は自動で保存されます</div>
+</dialog>
+
+<script>
+const USER_SETTINGS = {
+  storageKey: "copy-generator-settings-v2",
+  appTitle: "Stillboard Copy",
+  defaults: {
+    serverUrl: "http://localhost:1234",
+    model: "",
+    season: "",
+    costume: "",
+    keywords: "",
+    mood: "",
+    extraNote: "",
+    count: 10,
+    maxRounds: 10,
+    temperature: 0.8,
+    batchSize: 5,
+    review: true,
+    ngWords: "学生、生徒、女子高生、女子校、JK、高校、中学、小学、学園、入学、新学期、放課後、チャイム、通学、教室、校舎、卒業、少女、ロリ、未成年"
+  },
+  legacyPromptHashes: { system: ["9a0db95e"], fix: ["89ef3d2f"] },
+  embed: { prefix: "catchcopy:", apiVersion: 1 },
+  repetition: {
+    kanjiRun: /[一-鿿々]+/g,
+    hiraganaRun: /[ぁ-ゖー]+/g,
+    hiraganaGram: 4,
+    katakanaWord: /[ァ-ヶー]{2,}/g,
+    kanjiOkurigana: /(?<![一-鿿々])[一-鿿々][ぁ-ゖ]/g
+  },
+  countOptions: { min: 1, max: 30 },
+  limits: { roundsMin: 1, roundsMax: 30, batchMin: 1, batchMax: 30, tempMin: 0, tempMax: 2 },
+  detect: {
+    hosts: ["http://localhost", "http://127.0.0.1"],
+    ports: [1234, 1235, 8080, 11434, 41343],
+    timeoutMs: 1500
+  },
+  requestTimeoutMs: 600000,
+  reviewTemperature: 0.2,
+  reviewLinePattern: /案\s*([0-9０-９]+)\s*[:：]?\s*(OK|ＯＫ|NG|ＮＧ)\s*[:：、。,，\-–ー]?\s*(.*)/i,
+  rules: {
+    lineCount: 3,
+    minLen: 20,
+    maxDiff: 2,
+    targetMin: 21,
+    targetMax: 24,
+    lineTolerance: 1,
+    line2Endings: ["！", "!", "。"],
+    monthPattern: "[0-9０-９一二三四五六七八九十]+月",
+    keywordVerbPattern: "を(厳選|ご紹介|紹介|お届け|ピックアップ|公開|大公開)",
+    bareKeywordMinLen: 2
+  },
+  listSeparator: /[、,，\n]+/,
+  linePrefixPattern: /^\s*(?:案\s*[0-9０-９]+\s*[:：.．)）]?|[0-9０-９]+\s*行目\s*[:：]?|[0-9０-９]+\s*[.．)）:：]|[・●○■◆\-*]|【[^】]*】)\s*/,
+  lineSuffixPattern: /[\s　]*[（(][^（）()]*文字[^（）()]*[）)]\s*$/,
+  toastMs: 1600,
+  placeholders: [
+    ["{{theme}}", "テーマ4項目＋追加の指示＋NGワードをまとめた文"],
+    ["{{season}}", "季節・時期"],
+    ["{{costume}}", "衣装・アイテム"],
+    ["{{keywords}}", "キーワード（「、」区切り）"],
+    ["{{mood}}", "狙いたい雰囲気"],
+    ["{{extraNote}}", "追加の指示（空なら何も入らない）"],
+    ["{{ngWords}}", "NGワード"],
+    ["{{samples}}", "参考サンプル（ルールを満たす案だけ・順番は毎回入れ替え）"],
+    ["{{count}}", "今回頼む案の数（生成・修正の依頼文で使用）"],
+    ["{{avoid}}", "すでにOKになった案（生成の依頼文で使用・なければ空）"],
+    ["{{items}}", "NGの案と直すこと（修正の依頼文で使用）"],
+    ["{{minLen}} {{maxDiff}} {{targetMin}} {{targetMax}}", "文字数のルール（最低文字数・行間の差・目標の範囲）"]
+  ],
+  defaultPrompts: {
+    system: `あなたはデジタル写真集販売サイトの専属キャッチコピーライターです。
+バナー広告に載せる3行のキャッチコピーを書きます。読んだ人が写真を見た瞬間の高揚感を想像し、思わずクリックしたくなる文章にしてください。
+
+# 3行の役割
+1行目【情景】季節・気温・空気感・音・光の描写に、今回のテーマ（衣装・キーワード・雰囲気）を結びつけた情緒的な導入。
+　季節の描写だけで終わらせない。衣装が風に揺れる、光が肌や衣装を照らす、など、女の子や衣装の姿が浮かぶ情景にする。
+　型の例：「〇〇（季節の風・光）に〇〇（衣装）が揺れる、〇〇の午後」「〇〇（季節）の〇〇が、〇〇（衣装・肌）をやわらかく照らす」
+　良い例：「潮風にビキニの紐がふわりと揺れる、晩夏の午後」「春風がプリーツスカートの裾をそっと揺らす午後」
+　文末は「〜に」「〜季節」「〜ひととき」「…」「。」「！」などから選ぶ。
+　※参考サンプルの1行目には季節だけを描いたものもあるが、今回は必ずテーマと結びつける。
+2行目【紹介】作品を紹介し、勢いのある決め台詞で締める。
+　型：［魅力を表す言葉］＋「キーワード」＋［作品・コレクション・シリーズ・作品集］＋を＋［厳選して・特別に・たっぷり］＋［ご紹介！・お届け！・ピックアップ！・大公開！］
+3行目【誘い】女の子の魅力や見どころを描き、読者を誘う言葉で締める。
+　締めの例：「ご堪能ください。」「ご堪能あれ。」「お楽しみに！」「お見逃しなく！」「目が離せない！」
+
+# トーン
+- 「狙いたい雰囲気」に合わせて言葉を選ぶ。
+　元気・キュート → 弾む、きらきら、笑顔いっぱい、ワクワク、キュート
+　爽やか・スポーティ → 澄んだ、眩しい、躍動、引き締まった、はつらつ
+　艶やか・セクシー → 色香、艶姿、火照る、誘惑、悩殺、大胆、滴る
+- 全体として、少し大人の魅力・艶やかさ・癒やしを感じる言葉を選ぶ。単なる説明文にしない。
+- 3行で1つの流れにする。1行目の情景・2行目の紹介・3行目の誘いが、同じテーマでつながるようにする。
+
+# 日本語の質（文字数よりも優先する）
+- 声に出して読んで、意味がそのまま通る自然な日本語にする。助詞（の・を・に・が）のつながり、主語と述語の対応に気をつける。
+- 文字数を合わせるために、助詞を抜いたり、関係のない言葉を無理につなげたりしない。文字数は、修飾語を足す・削る・言い換えることで調整する。
+- 慣用句やことわざは正しい形で使う。うろ覚えの表現や造語は使わない。
+- 悪い例（意味が通らない）：
+　「見せるためだけに穿いた、瞳のご堪能ください。」→「瞳の」と「ご堪能ください」がつながらない
+　「魅惑の衣装に火照る瞳、見て見ぬ手は不可能でしょう。」→「見て見ぬふり」の言い間違いで意味が通らない
+- 書き終えたら1行ずつ読み返し、意味が通らない行は書き直してから出力する。
+
+# 必ず守るルール
+1. 1行は全角{{targetMin}}〜{{targetMax}}文字。{{minLen}}文字未満は不可。3行の文字数をそろえる（最も長い行と短い行の差は{{maxDiff}}文字以内）。
+2. 2行目は「！」か「。」で終える。
+3. キーワードは必ず「」で囲み、各案で1回以上使う。「」なしでは使わない。
+4. キーワードは「〇〇」作品・「〇〇」コレクションのように名詞につなげる。「〇〇」を厳選ご紹介！のように「を」で直接動詞につながない。
+5. 月の表記（三月、8月など）は使わない。真夏・晩夏・残暑・初春などの季節の言葉にする。
+6. 学生・生徒・放課後など、学校や未成年を想起させる語は使わない。登場するのは成人女性のみ。
+7. 参考サンプルの文をそのまま使わない。真似るのはリズムと構成だけ。サンプルの「」内の語は別のテーマのキーワードなので、今回のキーワードに置き換えて考える。
+8. 案どうしで、同じ書き出し・同じ言い回しを繰り返さない。
+9. 1案（3行）の中で、同じ言葉・同じ言い回しは1回までにする。キーワードも1回だけ使う。
+　悪い例：1行目と3行目の両方に「弾ける」、2行目と3行目の両方に「たっぷり」、1行目と3行目の両方に「夏」を使う。
+　言いたいことが重なるときは、類語に言い換える（例：弾ける→躍動する・跳ねる、眩しい→まばゆい・輝く、たっぷり→存分に・心ゆくまで）。
+
+# 参考サンプル（実際に採用された文）
+{{samples}}
+
+# 出力フォーマット
+- 1案は3行。案と案の間は空行を1行入れる。
+- 番号・記号・見出し・説明・文字数は書かない。キャッチコピー本文だけを出力する。`,
+    generate: `{{theme}}
+
+このテーマで、キャッチコピーを{{count}}案書いてください。
+
+{{avoid}}`,
+    fix: `{{theme}}
+
+次の{{count}}案はルールを満たしていません。「直すこと」に従って修正し、同じ順番で{{count}}案を出力してください。
+文字数は、修飾語を足す・削る・言い換えることで調整し、意味とリズムはできるだけ残してください。
+日本語として自然な文にすることを最優先し、助詞を抜く・言葉を無理につなげるといった調整はしないでください。
+「日本語チェック」の指摘がある行は、言い回しから書き直してください。
+
+{{items}}
+
+出力は修正後のキャッチコピー本文だけにしてください（【修正対象】の見出し・文字数・説明は書かない）。`,
+    review: `あなたは日本語の広告コピーを校閲する編集者です。次のキャッチコピー案を1案ずつ読み、問題がないかを判定してください。
+
+# 今回のテーマ
+衣装・アイテム：{{costume}}
+キーワード：{{keywords}}
+狙いたい雰囲気：{{mood}}
+
+# 確認すること
+1. 日本語として自然か。声に出して読んで意味がそのまま通るか。助詞のつながり、主語と述語の対応、言葉の組み合わせがおかしくないか。慣用句の言い間違いがないか。
+　悪い例：「見せるためだけに穿いた、瞳のご堪能ください。」→「瞳の」と「ご堪能ください」がつながらない
+　悪い例：「見て見ぬ手は不可能でしょう。」→「見て見ぬふり」の言い間違い
+2. 1行目が季節の描写だけで終わらず、衣装・キーワード・雰囲気のどれかと結びついた情景になっているか。
+3. 3行が同じテーマで1つの流れになっているか。
+
+文字数・記号・NGワードはすでに確認済みなので、判定には含めない。
+少しでも意味が通らない行がある案はNGにする。
+
+# 判定する案
+{{items}}
+
+# 出力フォーマット（この形式の行だけを出力し、ほかの説明は書かない）
+案1：OK
+案2：NG 2行目「〇〇」の助詞のつながりが不自然`,
+    samples: `汗ばむ風が心地よく肌を撫でる秋の午後に。
+弾ける汗と眩しい笑顔をたっぷりとご紹介！
+走り抜けた一瞬の輝きをご堪能ください！
+
+澄んだ空気が汗ばむ肌を優しくくすぐる秋。
+磨き抜かれたスポーティな肉体美を大公開！
+見ごたえ抜群の女の子をお楽しみください！
+
+涼やかな風がそっと火照る肌をかすめる季節。
+引き締まった身体が魅力的な作品を大公開！
+笑顔がまぶしい女の子達をお楽しみください！
+
+風薫る秋のグラウンドに響き渡る熱い歓声。
+弾ける躍動感を余すことなくピックアップ！
+火照る素肌が語る眩しい青春をお楽しみに！
+
+涼やかな風がそっと火照る肌を撫でてゆく季節
+力強い「スポーツ」の躍動をたっぷりご紹介！
+一滴の努力までも余さずじっくりご堪能あれ。
+
+澄みきった秋空へ高らかに響く元気な掛け声
+力強い「スポーツ」の姿をたっぷりとご紹介！
+眩しいパワーを心ゆくまでぜひご堪能あれ！
+
+軽やかな足取りで元気に駆け抜けるまぶしい姿！
+弾む笑顔の「スポーツ」作品を厳選しご紹介！
+はつらつとした魅力をぜひお楽しみください！
+
+きらきら光がはじける、元気が溢れる昼下がり！
+笑顔いっぱいの「メイド」コレクションをご紹介！
+とってもキュートな女の子達から目が離せない！
+
+ふわふわ足取りが弾む、楽しい１日の始まりに！
+元気な「メイド」さん達を厳選しピックアップ！
+女の子達の弾む笑顔を是非お楽しみください！
+
+「メイド」さん達の明るい笑い声が聞こえてくる
+元気いっぱいの作品を厳選してピックアップ！
+見る人みんなを笑顔にする１枚をお楽しみに！
+
+そっと扉の向こうから漂う、甘く誘う気配へ…
+艶やかな「メイド」作品を厳選しピックアップ！
+ご主人様だけに見せる特別な姿をご堪能あれ。
+
+クラシックが聞こえてくるような優雅な昼下がり。
+献身と誘惑を纏ったとっておきの作品をご紹介。
+あなたの「メイド」さん達がお待ちしております。
+
+静まり返った夜にそっと忍び寄る、甘やかな気配。
+可憐で妖しい「メイド」作品を厳選してご紹介。
+尽くす健気さの裏に潜む艶やかな姿をお楽しみに。
+
+薄い衣装の奥に潜む艶かしいラインが眩しい…
+大胆不敵な「メイド」シリーズをピックアップ！
+隠しきれない色香に思わず目が離せなくなるかも。
+
+じりじりと肌を焼く残暑が続く夏の終わりに
+「ラストサマー」を飾る作品を厳選しご紹介！
+あなたを誘惑する水着姿をどうぞご堪能あれ。
+
+蝉の声が少しずつ遠くなってくるこの時期に
+「ラストサマー」を彩るビキニ姿を特別にお届け！
+まだまだ終わらない夏を彼女達と味わい尽くせ！
+
+まだ終われない！熱気が漂う残暑の真っただ中に
+「ラストサマー」作品を厳選してピックアップ！
+女の子達の弾む水着姿にワクワクが止まらない！
+
+つらかった熱気も名残惜しく感じるこの季節に
+輝く「ラストサマー」コレクションをお届け！
+大胆に着こなすビキニ姿をどうかお見逃しなく！
+
+まだまだ暑さが残る、楽しかった夏の終わりに
+悩殺の「ラストサマー」コレクションをご紹介！
+ひと夏の余白埋める魅惑の作品をお届けします。
+
+まだ終わらせたくない！熱気が残る夏の日々に
+夏のラストスパートを飾る作品をご紹介！
+潤む肌が纏う夏の余韻をどうぞご堪能ください。
+
+終わりゆく夏を惜しむ蝉時雨が響き渡る中で
+「ラストサマー」水着コレクションをご紹介。
+弾ける笑顔がまぶしい女の子達をお楽しみに！
+
+陽射しがじりじり照りつける眩しい真夏の昼下がり
+弾け飛ぶ「スプラッシュ」コレクションをご紹介！
+濡れた素肌が艶めく、極上の一瞬をお見逃しなく。
+
+蝉の声が響きわたる、熱気こもる真夏のひととき
+涼を呼ぶ「スプラッシュ」コレクションをお届け！
+飛び散る水滴が描く、大人の艶姿をご堪能あれ。
+
+むせ返るような熱気を吹き払う、真夏の一陣
+爽快感満点の「スプラッシュ」作品を厳選！
+水を纏うことで増す艶やかさをお見逃しなく！
+
+涼を呼ぶ水音が響く、長い真夏の午後のひととき
+厳選された「スプラッシュ」作品をピックアップ！
+滴る水滴がつくる艶やかな一瞬をご堪能ください。
+
+風鈴の音が涼を誘う、長く続く夏の昼下がり。
+水しぶき舞う「スプラッシュ」を厳選しご紹介！
+濡れ透ける衣装に潜む、大人の魅力をお楽しみに。
+
+汗ばむ肌に風が心地よい、長く続く真夏の昼間
+弾ける笑顔と「スプラッシュ」をピックアップ！
+滴る水滴が彩る艶やかさを、とくとご覧あれ…
+
+強い日差しが揺らめく、真夏の眩しい水辺の景色
+涼感たっぷりの「スプラッシュ」を厳選してご紹介！
+濡れた肢体がつくる、贅沢な夏をお届けします。
+
+青い空と潮風が頬をなでる、ホットな季節に。
+弾けるような夏のビキニ作品を厳選しお届け！
+見ているだけで涼しくなれる一枚をご覧あれ！
+
+じりじりと照りつける夏の太陽の下で
+弾けるような笑顔とビキニをお届け！
+この夏いちばん眩しい瞬間がここにある！
+
+眩しすぎる太陽が全てを照らし出す…
+今夏最大級のビキニ作品を大公開！
+この夏一番の熱量を、目に焼き付けろ！
+
+蒸し暑い夜に汗ばむ肌がまぶしい季節。
+官能的なビキニ作品を厳選しご紹介。
+理性がほどけていく、大人の夏がここに。
+
+眩しい太陽が、すべてをさらけ出す季節。
+衝撃のビキニ姿の女の子を今夏も大公開！
+大人の夏を彩る、魅惑の作品をお楽しみに！
+
+焼けるようなアスファルト、滴る汗…
+目が眩むほどの大胆なビキニをお届け！
+とってもセクシーな女の子を見逃すな！
+
+みんなが開放的になっちゃうこの夏に！
+大人の魅力が満載のビキニ作品をお届け！
+大胆な女の子にドキドキすること間違いなし！`
+  },
+  messages: {
+    pillChecking: "文章AI: 確認中",
+    pillOk: (n) => `文章AI: 接続OK（${n}モデル）`,
+    pillDown: "文章AI: 接続できません",
+    noModel: "モデルがありません",
+    detecting: "探しています…",
+    detectFound: (url) => `見つかりました：${url}`,
+    detectNone: "見つかりませんでした。Bionic のローカルAPIサーバーと CORS がオンか、URL（ポート番号）を確認してください。",
+    connOk: (n) => `🟢 接続できました（モデル ${n}件）`,
+    connNg: (e) => `🔴 接続できません（${e}）。サーバーが起動しているか、CORS がオンか、URL を確認してください。`,
+    countOption: (n) => `${n}案`,
+    selectModel: "文章AIのモデルを選んでください（モデルが出ないときは「設定」→「文章AI」で接続を確認）。",
+    needInputs: "季節・時期、衣装、キーワード、雰囲気をすべて入力してください。",
+    idle: "テーマを入力して「実行」を押してください。",
+    running: (ok, total, round, step) => `${step}… OK ${ok} / ${total} 案（${round}回目）`,
+    stepGenerate: "新しい案を依頼中",
+    stepFix: "NGの案の修正を依頼中",
+    stepReview: "日本語チェックを依頼中",
+    reviewItemHeader: (i) => `案${i}`,
+    reviewNoReason: "意味の通らない箇所があります",
+    logReview: (n) => `日本語チェックを依頼：${n}案`,
+    logReviewResult: (ok, ng) => `日本語チェック：OK ${ok}案 / NG ${ng}案`,
+    verdictOk: (n) => `【総合判定】OK（全${n}案、警告なし）`,
+    verdictNg: (ok, total) => `【総合判定】NG（OK ${ok} / ${total} 案）\n最大回数に達しました。もう一度実行するか、「最大回数」を増やしてください。`,
+    aborted: "中止しました。",
+    busy: "生成中です。終わってから実行してください。",
+    errorPrefix: "エラー：",
+    empty: "ここに生成した案が表示されます",
+    copied: "コピーしました",
+    copy: "コピー",
+    copiesCount: (ok, total) => total ? `OK ${ok} / ${total}` : "",
+    caseLabel: (i) => `案${i}`,
+    statusOk: "OK",
+    statusNg: "NG",
+    lenUnit: "字",
+    samplesCount: (used, total) => `お手本に使う ${used} / ${total} 案`,
+    samplesSkipped: (n) => `文字数のルールを満たさない、1案の中で同じ言葉を2回以上使っている、または「キーワード」を…のように動詞へ直接つないでいる ${n} 案は、お手本から外しています。`,
+    previewNeedInputs: "（テーマが未入力の項目は空のまま組み立てています）",
+    externalSeparator: "\n\n---\n\n",
+    externalCopied: "コピーしました。Claude・ChatGPT のチャットに貼り付けてください。",
+    externalDownloaded: (name) => `${name} をダウンロードしました。`,
+    externalMissing: "テーマに未入力の項目があります（空のまま出力しました）。",
+    externalFileName: (stamp) => `キャッチコピー_プロンプト_${stamp}.md`,
+    theme: {
+      header: "# 今回のテーマ",
+      season: "季節・時期",
+      costume: "衣装・アイテム",
+      keywords: "キーワード",
+      mood: "狙いたい雰囲気",
+      extraNote: "追加の指示",
+      ngWords: "使用禁止の語"
+    },
+    avoidHeader: "次の案はすでに採用候補です。同じ書き出し・言い回しは避けてください。",
+    fixItemHeader: (i) => `【修正対象${i}】`,
+    fixTodo: "直すこと：",
+    fixLineOk: (i, len) => `・${i}行目：${len}文字 → このままでOK`,
+    fixLinePlus: (i, len, d, t) => `・${i}行目：${len}文字 → あと${d}文字増やして${t}文字前後に`,
+    fixLineMinus: (i, len, d, t) => `・${i}行目：${len}文字 → ${d}文字減らして${t}文字前後に`,
+    logStart: (n, model) => `開始：${n}案 / モデル ${model}`,
+    logGenerate: (n) => `新しい案を依頼：${n}案`,
+    logFix: (n) => `修正を依頼：${n}案`,
+    logReceived: (n) => `受信：${n}案`,
+    logResult: (ok, ng) => `判定：OK ${ok}案 / NG ${ng}案`,
+    logShortage: (n) => `返ってきた案が ${n}案 足りません。次の回で補います。`,
+    logFinal: (ok, total) => `最終チェック（全案まとめて再判定）：OK ${ok} / ${total}`,
+    rulesHelp: [
+      ["行数", "3行"],
+      ["文字数", "各行20文字以上、行間の文字数差は2文字以内"],
+      ["2行目の文末", "「！」または「。」"],
+      ["NGワード", "下のリストの語を含まない"],
+      ["月の表記", "「8月」「三月」などを含まない"],
+      ["キーワード", "「」付きで1回以上使う。「」なしで使わない（1文字のキーワードは除く）。「キーワード」を厳選…のように動詞へ直接つながない"],
+      ["重複", "他の案・参考サンプルと同じ文を含まない"],
+      ["言葉の重複", "1案の中で同じ言葉を2回以上使わない（漢字2文字以上の語・漢字1文字＋送り仮名の語・カタカナ語・ひらがな4文字以上の並びで判定）"],
+      ["日本語チェック", "上のチェックを通った案をLLMが校閲し、意味が通らない文・1行目がテーマとつながっていない案をNGにする（オンのとき）"]
+    ],
+    err: {
+      lineCount: (n) => `行数が${n}行です（3行にしてください）`,
+      tooShort: (i, len) => `${i}行目が${len}文字です（20文字以上にしてください）`,
+      diff: (diff) => `行間の文字数差が${diff}文字です（2文字以内にしてください）`,
+      line2End: "2行目の文末が「！」または「。」で終わっていません（勢いのある決め台詞で締めてください）",
+      ngWord: (w) => `NGワード「${w}」が含まれています`,
+      month: (m) => `月の表記「${m}」が含まれています（季節の言葉にしてください）`,
+      noKeyword: (kws) => `キーワード（${kws}）を「」付きで使っていません`,
+      bareKeyword: (k) => `キーワード「${k}」を「」で囲まずに使っています`,
+      keywordVerb: (k) => `「${k}」を動詞に直接つないでいます（「${k}」作品・コレクションのように名詞につなげてください）`,
+      duplicate: "他の案と同じ文です",
+      sampleCopy: (i) => `${i}行目が参考サンプルと同じ文です（言い回しを変えてください）`,
+      review: (reason) => `日本語チェック：${reason}`,
+      repeat: (w) => `同じ言葉「${w}」を2回以上使っています（1案の中では1回まで。片方を別の言葉に言い換えてください）`
+    }
+  }
+};
+
+// ===== SETTINGS STORE =====
+class SettingsStore {
+  constructor(key) {
+    this.key = key;
+  }
+  load() {
+    const base = { ...USER_SETTINGS.defaults, prompts: { ...USER_SETTINGS.defaultPrompts } };
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.key) || "{}");
+      const prompts = { ...(saved.prompts || {}) };
+      Object.entries(USER_SETTINGS.legacyPromptHashes).forEach(([k, hashes]) => {
+        if (typeof prompts[k] === "string" && hashes.includes(TextUtil.hash(prompts[k]))) delete prompts[k];
+      });
+      return { ...base, ...saved, prompts: { ...base.prompts, ...prompts } };
+    } catch {
+      return base;
+    }
+  }
+  save(values) {
+    try {
+      localStorage.setItem(this.key, JSON.stringify(values));
+    } catch {}
+  }
+}
+
+// ===== LLM CLIENT =====
+class LlmClient {
+  constructor(serverUrl) {
+    this.base = LlmClient.normalize(serverUrl);
+  }
+  static normalize(url) {
+    const trimmed = String(url || "").trim().replace(/\/+$/, "");
+    return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  }
+  async listModels(timeoutMs) {
+    const signal = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
+    const res = await fetch(`${this.base}/models`, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    return (json.data || []).map((m) => m.id).filter(Boolean);
+  }
+  async chat({ model, messages, temperature, signal }) {
+    const timeout = AbortSignal.timeout(USER_SETTINGS.requestTimeoutMs);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const res = await fetch(`${this.base}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages, temperature, stream: false }),
+      signal: combined
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${await res.text()}`);
+    const json = await res.json();
+    return json.choices?.[0]?.message?.content ?? "";
+  }
+}
+
+// ===== TEXT UTIL =====
+class TextUtil {
+  static len(s) {
+    return Array.from(s).length;
+  }
+  static splitList(s) {
+    return String(s || "").split(USER_SETTINGS.listSeparator).map((x) => x.trim()).filter(Boolean);
+  }
+  static escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  static escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  static fill(template, vars) {
+    return String(template)
+      .replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? String(vars[k]) : m))
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  static hash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16);
+  }
+  static shuffle(list) {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  static clamp(x, lo, hi, def) {
+    return Math.min(hi, Math.max(lo, Number.isFinite(x) ? x : def));
+  }
+}
+
+// ===== COPY PARSER =====
+class CopyParser {
+  static parse(raw) {
+    const cleaned = String(raw)
+      .replace(/<think>[\s\S]*?<\/think>/g, "")
+      .replace(/^[\s\S]*<\/think>/, "")
+      .replace(/```[a-zA-Z]*\n?/g, "")
+      .replace(/\r\n?/g, "\n");
+    const lines = cleaned.split("\n").map((l) => l
+      .replace(USER_SETTINGS.linePrefixPattern, "")
+      .replace(USER_SETTINGS.lineSuffixPattern, "")
+      .trim());
+    const blocks = [];
+    let current = [];
+    for (const line of lines) {
+      if (line === "") {
+        if (current.length) blocks.push(current);
+        current = [];
+      } else {
+        current.push(line);
+      }
+    }
+    if (current.length) blocks.push(current);
+    const lineCount = USER_SETTINGS.rules.lineCount;
+    const result = [];
+    for (const block of blocks) {
+      if (block.length > lineCount && block.length % lineCount === 0) {
+        for (let i = 0; i < block.length; i += lineCount) result.push(block.slice(i, i + lineCount));
+      } else {
+        result.push(block);
+      }
+    }
+    return result.filter((b) => !(b.length === 1 && /[:：]$/.test(b[0])));
+  }
+}
+
+// ===== REVIEW PARSER =====
+class ReviewParser {
+  static parse(raw) {
+    const verdicts = new Map();
+    const cleaned = String(raw).replace(/<think>[\s\S]*?<\/think>/g, "").replace(/^[\s\S]*<\/think>/, "");
+    for (const line of cleaned.split(/\r?\n/)) {
+      const m = line.replace(/[*#`]/g, "").match(USER_SETTINGS.reviewLinePattern);
+      if (!m) continue;
+      const index = Number(m[1].replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)));
+      const ng = /^(NG|ＮＧ)$/i.test(m[2]);
+      verdicts.set(index, { ng, reason: m[3].trim() });
+    }
+    return verdicts;
+  }
+}
+
+// ===== REPETITION FINDER =====
+class RepetitionFinder {
+  static find(lines) {
+    const p = USER_SETTINGS.repetition;
+    const text = lines.join("\n");
+    const found = new Set();
+    const kanjiRuns = text.match(p.kanjiRun) || [];
+    RepetitionFinder.mergeGrams(kanjiRuns.filter((r) => r.length >= 2), 2, found);
+    RepetitionFinder.mergeGrams(text.match(p.hiraganaRun) || [], p.hiraganaGram, found);
+    RepetitionFinder.sameTokens(text.match(p.katakanaWord) || [], found);
+    RepetitionFinder.sameTokens(text.match(p.kanjiOkurigana) || [], found);
+    return [...found];
+  }
+  static sameTokens(tokens, found) {
+    const counts = new Map();
+    tokens.forEach((t) => counts.set(t, (counts.get(t) || 0) + 1));
+    counts.forEach((n, t) => { if (n > 1) found.add(t); });
+  }
+  static mergeGrams(runs, n, found) {
+    const counts = new Map();
+    runs.forEach((r) => {
+      for (let i = 0; i + n <= r.length; i++) {
+        const g = r.slice(i, i + n);
+        counts.set(g, (counts.get(g) || 0) + 1);
+      }
+    });
+    runs.forEach((r) => {
+      let start = -1;
+      let end = -1;
+      for (let i = 0; i + n <= r.length; i++) {
+        if (counts.get(r.slice(i, i + n)) < 2) continue;
+        if (start >= 0 && i > end) {
+          found.add(r.slice(start, end));
+          start = -1;
+        }
+        if (start < 0) start = i;
+        end = i + n;
+      }
+      if (start >= 0) found.add(r.slice(start, end));
+    });
+  }
+}
+
+// ===== SAMPLE LIBRARY =====
+class SampleLibrary {
+  constructor(text) {
+    const r = USER_SETTINGS.rules;
+    const verb = new RegExp(`」${r.keywordVerbPattern}`);
+    this.all = CopyParser.parse(text);
+    this.usable = this.all.filter((b) => {
+      if (b.length !== r.lineCount) return false;
+      const lens = b.map(TextUtil.len);
+      if (Math.min(...lens) < r.minLen || Math.max(...lens) - Math.min(...lens) > r.maxDiff) return false;
+      if (RepetitionFinder.find(b).length) return false;
+      return !verb.test(b.join(""));
+    });
+    this.lineSet = new Set(this.all.flat());
+  }
+  format(shuffled) {
+    const list = shuffled ? TextUtil.shuffle(this.usable) : this.usable;
+    return list.map((b) => b.join("\n")).join("\n\n");
+  }
+}
+
+// ===== COPY VALIDATOR =====
+class CopyValidator {
+  constructor({ keywords, ngWords, sampleLines }) {
+    this.keywords = keywords;
+    this.ngWords = ngWords;
+    this.sampleLines = sampleLines || new Set();
+    this.rules = USER_SETTINGS.rules;
+    this.err = USER_SETTINGS.messages.err;
+  }
+  validate(lines, others = []) {
+    const r = this.rules;
+    const lengthErrors = [];
+    const errors = [];
+    const lengths = lines.map(TextUtil.len);
+    const text = lines.join("");
+    if (lines.length !== r.lineCount) errors.push(this.err.lineCount(lines.length));
+    lengths.forEach((len, i) => {
+      if (len < r.minLen) lengthErrors.push(this.err.tooShort(i + 1, len));
+    });
+    if (lengths.length) {
+      const diff = Math.max(...lengths) - Math.min(...lengths);
+      if (diff > r.maxDiff) lengthErrors.push(this.err.diff(diff));
+    }
+    if (lines[1] && !r.line2Endings.some((e) => lines[1].endsWith(e))) errors.push(this.err.line2End);
+    for (const w of this.ngWords) {
+      if (text.includes(w)) errors.push(this.err.ngWord(w));
+    }
+    const month = text.match(new RegExp(r.monthPattern));
+    if (month) errors.push(this.err.month(month[0]));
+    errors.push(...this.checkKeywords(text));
+    lines.forEach((line, i) => {
+      if (this.sampleLines.has(line)) errors.push(this.err.sampleCopy(i + 1));
+    });
+    RepetitionFinder.find(lines).forEach((w) => errors.push(this.err.repeat(w)));
+    const joined = lines.join("\n");
+    if (others.some((o) => o.join("\n") === joined)) errors.push(this.err.duplicate);
+    const all = [...lengthErrors, ...errors];
+    return { lines, lengths, errors: all, otherErrors: errors, lengthIssue: lengthErrors.length > 0, ok: all.length === 0 };
+  }
+  checkKeywords(text) {
+    const errors = [];
+    if (!this.keywords.length) return errors;
+    const bracketed = this.keywords.filter((k) => text.includes(`「${k}」`));
+    if (!bracketed.length) errors.push(this.err.noKeyword(this.keywords.join("、")));
+    for (const k of this.keywords) {
+      const e = TextUtil.escapeRegExp(k);
+      if (TextUtil.len(k) >= this.rules.bareKeywordMinLen) {
+        const bare = new RegExp(`(?<!「)${e}|${e}(?!」)`);
+        if (bare.test(text)) errors.push(this.err.bareKeyword(k));
+      }
+      if (new RegExp(`「${e}」${this.rules.keywordVerbPattern}`).test(text)) errors.push(this.err.keywordVerb(k));
+    }
+    return errors;
+  }
+}
+
+// ===== PROMPT BUILDER =====
+class PromptBuilder {
+  constructor(params, prompts) {
+    this.p = params;
+    this.prompts = prompts;
+    this.samples = new SampleLibrary(prompts.samples);
+    this.r = USER_SETTINGS.rules;
+    this.msg = USER_SETTINGS.messages;
+  }
+  theme() {
+    const t = this.msg.theme;
+    const p = this.p;
+    const lines = [
+      t.header,
+      `${t.season}：${p.season}`,
+      `${t.costume}：${p.costume}`,
+      `${t.keywords}：${p.keywords.join("、")}`,
+      `${t.mood}：${p.mood}`
+    ];
+    if (p.extraNote) lines.push(`${t.extraNote}：${p.extraNote}`);
+    if (p.ngWords.length) lines.push(`${t.ngWords}：${p.ngWords.join("、")}`);
+    return lines.join("\n");
+  }
+  baseVars() {
+    const p = this.p;
+    const t = this.msg.theme;
+    return {
+      theme: this.theme(),
+      season: p.season,
+      costume: p.costume,
+      keywords: p.keywords.join("、"),
+      mood: p.mood,
+      extraNote: p.extraNote ? `${t.extraNote}：${p.extraNote}` : "",
+      ngWords: p.ngWords.join("、"),
+      minLen: this.r.minLen,
+      maxDiff: this.r.maxDiff,
+      targetMin: this.r.targetMin,
+      targetMax: this.r.targetMax
+    };
+  }
+  system(shuffled = true) {
+    return TextUtil.fill(this.prompts.system, { ...this.baseVars(), samples: this.samples.format(shuffled) });
+  }
+  review(items) {
+    const blocks = items.map((item, i) => [this.msg.reviewItemHeader(i + 1), ...item.lines].join("\n"));
+    return TextUtil.fill(this.prompts.review, { ...this.baseVars(), count: items.length, items: blocks.join("\n\n") });
+  }
+  external(n) {
+    return `${this.system(false)}${this.msg.externalSeparator}${this.generate(n, [])}\n`;
+  }
+  generate(n, existing) {
+    const avoid = existing.length ? `${this.msg.avoidHeader}\n\n${existing.map((l) => l.join("\n")).join("\n\n")}` : "";
+    return TextUtil.fill(this.prompts.generate, { ...this.baseVars(), count: n, avoid });
+  }
+  fix(items) {
+    const blocks = items.map((item, i) => [
+      this.msg.fixItemHeader(i + 1),
+      ...item.lines,
+      this.msg.fixTodo,
+      ...this.fixTodos(item)
+    ].join("\n"));
+    return TextUtil.fill(this.prompts.fix, { ...this.baseVars(), count: items.length, items: blocks.join("\n\n") });
+  }
+  fixTodos(item) {
+    const todos = [];
+    if (item.lengthIssue) {
+      const sorted = [...item.lengths].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const target = TextUtil.clamp(median, this.r.targetMin, this.r.targetMax, this.r.targetMin);
+      item.lengths.forEach((len, i) => {
+        const d = target - len;
+        if (Math.abs(d) <= this.r.lineTolerance) todos.push(this.msg.fixLineOk(i + 1, len));
+        else if (d > 0) todos.push(this.msg.fixLinePlus(i + 1, len, d, target));
+        else todos.push(this.msg.fixLineMinus(i + 1, len, -d, target));
+      });
+    }
+    item.otherErrors.forEach((e) => todos.push(`・${e}`));
+    return todos;
+  }
+}
+
+// ===== COPY GENERATOR =====
+class CopyGenerator {
+  constructor({ client, model, temperature, params, prompts, count, maxRounds, batchSize, review, avoid = [], onProgress, onLog }) {
+    this.avoid = avoid;
+    this.client = client;
+    this.model = model;
+    this.temperature = temperature;
+    this.count = count;
+    this.maxRounds = maxRounds;
+    this.batchSize = batchSize;
+    this.reviewEnabled = review;
+    this.onProgress = onProgress;
+    this.onLog = onLog;
+    this.prompts = new PromptBuilder(params, prompts);
+    this.validator = new CopyValidator({ ...params, sampleLines: this.prompts.samples.lineSet });
+    this.msg = USER_SETTINGS.messages;
+  }
+  async ask(userContent, signal) {
+    const raw = await this.client.chat({
+      model: this.model,
+      temperature: this.temperature,
+      signal,
+      messages: [
+        { role: "system", content: this.prompts.system(true) },
+        { role: "user", content: userContent }
+      ]
+    });
+    const blocks = CopyParser.parse(raw);
+    this.onLog(this.msg.logReceived(blocks.length));
+    return blocks;
+  }
+  async judge(blocks, accepted, failed, signal) {
+    const passed = [];
+    for (const lines of blocks) {
+      const res = this.validator.validate(lines, [...this.avoid, ...[...accepted, ...passed].map((a) => a.lines)]);
+      if (res.ok) passed.push(res);
+      else failed.push(res);
+    }
+    const reviewed = this.reviewEnabled && passed.length ? await this.review(passed, signal) : passed;
+    let ok = 0;
+    for (const res of reviewed) {
+      if (res.ok && accepted.length < this.count) {
+        accepted.push(res);
+        ok++;
+      } else if (!res.ok) {
+        failed.push(res);
+      }
+    }
+    return ok;
+  }
+  async review(items, signal) {
+    this.onLog(this.msg.logReview(items.length));
+    const raw = await this.client.chat({
+      model: this.model,
+      temperature: USER_SETTINGS.reviewTemperature,
+      signal,
+      messages: [{ role: "user", content: this.prompts.review(items) }]
+    });
+    const verdicts = ReviewParser.parse(raw);
+    const result = items.map((item, i) => {
+      const v = verdicts.get(i + 1);
+      if (!v || !v.ng) return item;
+      const err = this.msg.err.review(v.reason || this.msg.reviewNoReason);
+      return { ...item, ok: false, errors: [...item.errors, err], otherErrors: [...item.otherErrors, err] };
+    });
+    const ng = result.filter((r) => !r.ok).length;
+    this.onLog(this.msg.logReviewResult(result.length - ng, ng));
+    return result;
+  }
+  async run(signal) {
+    const accepted = [];
+    let failed = [];
+    let round = 0;
+    this.onLog(this.msg.logStart(this.count, this.model));
+    while (accepted.length < this.count && round < this.maxRounds) {
+      round++;
+      const nextFailed = [];
+      let okCount = 0;
+      const fixTargets = failed.slice(0, this.count - accepted.length);
+      if (fixTargets.length) {
+        this.onProgress({ accepted, failed, round, step: this.msg.stepFix });
+        this.onLog(this.msg.logFix(fixTargets.length));
+        const blocks = await this.ask(this.prompts.fix(fixTargets), signal);
+        okCount += await this.judge(blocks.slice(0, fixTargets.length), accepted, nextFailed, signal);
+        const shortage = fixTargets.length - blocks.length;
+        if (shortage > 0) {
+          this.onLog(this.msg.logShortage(shortage));
+          nextFailed.push(...fixTargets.slice(blocks.length));
+        }
+      }
+      const need = Math.min(this.batchSize, this.count - accepted.length - nextFailed.length);
+      if (need > 0) {
+        this.onProgress({ accepted, failed: nextFailed, round, step: this.msg.stepGenerate });
+        this.onLog(this.msg.logGenerate(need));
+        const blocks = await this.ask(this.prompts.generate(need, [...this.avoid, ...accepted.map((a) => a.lines)]), signal);
+        const fresh = [];
+        okCount += await this.judge(blocks.slice(0, need), accepted, fresh, signal);
+        nextFailed.push(...fresh);
+      }
+      failed = nextFailed.slice(0, Math.max(0, this.count - accepted.length));
+      this.onLog(this.msg.logResult(okCount, failed.length));
+      this.onProgress({ accepted, failed, round, step: this.msg.stepGenerate });
+    }
+    return this.finalCheck(accepted, failed, round);
+  }
+  finalCheck(accepted, failed, round) {
+    const rechecked = accepted.map((a, i) => this.validator.validate(a.lines, accepted.slice(0, i).map((x) => x.lines)));
+    const okList = rechecked.filter((r) => r.ok);
+    const ngList = [...rechecked.filter((r) => !r.ok), ...failed];
+    this.onLog(this.msg.logFinal(okList.length, this.count));
+    return { okList, ngList, round, allOk: okList.length === this.count && ngList.length === 0 };
+  }
+}
+
+// ===== EMBED BRIDGE =====
+class EmbedBridge {
+  constructor(app) {
+    this.app = app;
+    this.cfg = USER_SETTINGS.embed;
+    this.active = window.parent !== window;
+    this.hostOrigin = "*";
+    this.onMessage = (e) => this.handle(e);
+  }
+  init() {
+    if (!this.active) return;
+    window.addEventListener("message", this.onMessage);
+    this.post("ready", { apiVersion: this.cfg.apiVersion });
+  }
+  destroy() {
+    window.removeEventListener("message", this.onMessage);
+  }
+  post(kind, payload = {}) {
+    if (!this.active) return;
+    window.parent.postMessage({ type: `${this.cfg.prefix}${kind}`, ...payload }, this.hostOrigin);
+  }
+  static normalizeAvoid(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .map((x) => (Array.isArray(x) ? x : String(x).split(/\r?\n/)).map((l) => String(l).trim()).filter(Boolean))
+      .filter((x) => x.length);
+  }
+  async handle(e) {
+    if (e.source !== window.parent) return;
+    const data = e.data || {};
+    if (typeof data.type !== "string" || !data.type.startsWith(this.cfg.prefix)) return;
+    this.hostOrigin = e.origin && e.origin !== "null" ? e.origin : "*";
+    const kind = data.type.slice(this.cfg.prefix.length);
+    if (kind === "ping") return this.post("ready", { apiVersion: this.cfg.apiVersion });
+    if (kind === "cancel") return this.app.controller?.abort();
+    if (kind !== "generate") return;
+    const requestId = data.requestId ?? null;
+    if (this.app.controller) return this.post("error", { requestId, message: this.app.msg.busy });
+    this.app.applyParams(data.params || {});
+    await this.execute(requestId, EmbedBridge.normalizeAvoid(data.params?.avoid));
+  }
+  async runFromUser() {
+    await this.execute(null, []);
+  }
+  async execute(requestId, avoid) {
+    const outcome = await this.app.run({
+      avoid,
+      onProgress: (p) => this.post("progress", { requestId, ...p })
+    });
+    if (outcome.error) return this.post("error", { requestId, message: outcome.error, aborted: Boolean(outcome.aborted) });
+    const { result, count } = outcome;
+    const copies = result.okList.map((r) => r.lines);
+    this.post("result", {
+      requestId,
+      allOk: result.allOk,
+      count,
+      copies,
+      text: copies.map((l) => l.join("\n")).join("\n\n"),
+      ng: result.ngList.map((r) => ({ lines: r.lines, errors: r.errors }))
+    });
+  }
+}
+
+// ===== SETTINGS DIALOG =====
+class SettingsDialog {
+  constructor(app) {
+    this.app = app;
+    this.dialog = document.getElementById("settings");
+    this.tabs = [...this.dialog.querySelectorAll(".tabs [role=tab]")];
+    this.panes = [...this.dialog.querySelectorAll(".pane")];
+  }
+  init() {
+    const app = this.app;
+    this.tabs.forEach((t) => app.on(t, "click", () => this.show(t.dataset.pane)));
+    app.on(document.getElementById("close-settings"), "click", () => this.dialog.close());
+    app.on(this.dialog, "click", (e) => { if (e.target === this.dialog) this.dialog.close(); });
+    document.getElementById("placeholder-help").innerHTML = USER_SETTINGS.placeholders
+      .map(([k, v]) => `<dt>${TextUtil.escapeHtml(k)}</dt><dd>${TextUtil.escapeHtml(v)}</dd>`).join("");
+    document.getElementById("rules-help").innerHTML = USER_SETTINGS.messages.rulesHelp
+      .map(([k, v]) => `<dt>${TextUtil.escapeHtml(k)}</dt><dd>${TextUtil.escapeHtml(v)}</dd>`).join("");
+  }
+  open(pane) {
+    if (pane) this.show(pane);
+    if (!this.dialog.open) this.dialog.showModal();
+  }
+  show(pane) {
+    this.tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.pane === pane)));
+    this.panes.forEach((p) => { p.hidden = p.dataset.pane !== pane; });
+  }
+}
+
+// ===== APP =====
+class App {
+  constructor() {
+    this.store = new SettingsStore(USER_SETTINGS.storageKey);
+    this.msg = USER_SETTINGS.messages;
+    this.el = {};
+    ["pill-llm", "open-settings", "season", "costume", "keywords", "mood", "extraNote", "model", "maxRounds", "open-prompts",
+      "count", "run", "cancel", "progress", "progress-bar", "progress-pct", "verdict", "copies", "copies-count", "copy-all", "log",
+      "serverUrl", "detect", "test-conn", "conn-msg", "prompt-system", "prompt-generate", "prompt-fix", "prompt-samples",
+      "samples-count", "samples-skipped", "build-preview", "preview-system", "preview-generate", "temperature", "batchSize", "ngWords",
+      "copy-external", "download-external", "external-msg", "prompt-review", "review"
+    ].forEach((id) => { this.el[id] = document.getElementById(id); });
+    this.fields = ["serverUrl", "season", "costume", "keywords", "mood", "extraNote", "maxRounds", "temperature", "batchSize", "ngWords"];
+    this.promptFields = { system: "prompt-system", generate: "prompt-generate", fix: "prompt-fix", review: "prompt-review", samples: "prompt-samples" };
+    this.handlers = [];
+    this.controller = null;
+    this.lastOk = [];
+    this.toastTimer = null;
+    this.dialog = new SettingsDialog(this);
+    this.bridge = new EmbedBridge(this);
+  }
+  init() {
+    const s = this.store.load();
+    this.fields.forEach((id) => { this.el[id].value = s[id]; });
+    this.el.review.checked = Boolean(s.review);
+    Object.entries(this.promptFields).forEach(([k, id]) => { this.el[id].value = s.prompts[k]; });
+    this.savedModel = s.model;
+    this.el.count.innerHTML = Array.from({ length: USER_SETTINGS.countOptions.max - USER_SETTINGS.countOptions.min + 1 }, (_, i) => {
+      const n = USER_SETTINGS.countOptions.min + i;
+      return `<option value="${n}">${this.msg.countOption(n)}</option>`;
+    }).join("");
+    this.el.count.value = String(s.count);
+    this.dialog.init();
+    this.bind();
+    this.autogrow(this.el.extraNote);
+    this.updateSampleInfo();
+    this.setVerdict("idle", this.msg.idle);
+    this.renderCopies([], []);
+    this.loadModels().catch(() => {}).finally(() => this.bridge.init());
+  }
+  bind() {
+    const persist = () => this.persist();
+    this.fields.forEach((id) => this.on(this.el[id], "input", persist));
+    Object.values(this.promptFields).forEach((id) => this.on(this.el[id], "input", persist));
+    this.on(this.el["prompt-samples"], "input", () => this.updateSampleInfo());
+    this.on(this.el.count, "change", persist);
+    this.on(this.el.review, "change", persist);
+    this.on(this.el.model, "change", persist);
+    this.on(this.el.extraNote, "input", () => this.autogrow(this.el.extraNote));
+    this.on(this.el.serverUrl, "change", () => this.loadModels().catch(() => {}));
+    this.on(this.el["open-settings"], "click", () => this.dialog.open());
+    this.on(this.el["pill-llm"], "click", () => this.dialog.open("llm"));
+    this.on(this.el["open-prompts"], "click", () => this.dialog.open("system"));
+    this.on(this.el.detect, "click", () => this.detect());
+    this.on(this.el["test-conn"], "click", () => this.testConnection());
+    this.on(this.el["build-preview"], "click", () => this.buildPreview());
+    this.on(this.el["copy-external"], "click", () => this.copyExternal());
+    this.on(this.el["download-external"], "click", () => this.downloadExternal());
+    this.on(this.el.run, "click", () => this.bridge.runFromUser());
+    this.on(this.el.cancel, "click", () => this.controller?.abort());
+    this.on(this.el["copy-all"], "click", () => this.copyText(this.lastOk.map((r) => r.lines.join("\n")).join("\n\n")));
+    document.querySelectorAll("[data-reset]").forEach((btn) => this.on(btn, "click", () => this.resetField(btn.dataset.reset)));
+  }
+  on(target, type, fn) {
+    target.addEventListener(type, fn);
+    this.handlers.push([target, type, fn]);
+  }
+  destroy() {
+    this.handlers.forEach(([t, type, fn]) => t.removeEventListener(type, fn));
+    this.handlers = [];
+    this.bridge.destroy();
+    this.controller?.abort();
+    clearTimeout(this.toastTimer);
+  }
+  values() {
+    const v = {};
+    this.fields.forEach((id) => { v[id] = this.el[id].value; });
+    v.count = Number(this.el.count.value);
+    v.review = this.el.review.checked;
+    v.model = this.el.model.value || this.savedModel || "";
+    v.prompts = {};
+    Object.entries(this.promptFields).forEach(([k, id]) => { v.prompts[k] = this.el[id].value; });
+    return v;
+  }
+  persist() {
+    const v = this.values();
+    const changed = {};
+    Object.entries(v.prompts).forEach(([k, text]) => {
+      if (text !== USER_SETTINGS.defaultPrompts[k]) changed[k] = text;
+    });
+    this.store.save({ ...v, prompts: changed });
+  }
+  resetField(key) {
+    if (key === "ngWords") this.el.ngWords.value = USER_SETTINGS.defaults.ngWords;
+    else this.el[this.promptFields[key]].value = USER_SETTINGS.defaultPrompts[key];
+    if (key === "samples") this.updateSampleInfo();
+    this.persist();
+  }
+  autogrow(ta) {
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight + 2}px`;
+  }
+  updateSampleInfo() {
+    const lib = new SampleLibrary(this.el["prompt-samples"].value);
+    this.el["samples-count"].textContent = this.msg.samplesCount(lib.usable.length, lib.all.length);
+    const skipped = lib.all.length - lib.usable.length;
+    this.el["samples-skipped"].textContent = skipped ? this.msg.samplesSkipped(skipped) : "";
+  }
+
+  // CONNECTION
+  setPill(state, text) {
+    this.el["pill-llm"].dataset.state = state;
+    this.el["pill-llm"].textContent = text;
+  }
+  async loadModels() {
+    const select = this.el.model;
+    this.setPill("idle", this.msg.pillChecking);
+    try {
+      const models = await new LlmClient(this.el.serverUrl.value).listModels(USER_SETTINGS.detect.timeoutMs * 2);
+      const wanted = select.value || this.savedModel;
+      select.innerHTML = models.length
+        ? models.map((m) => `<option value="${TextUtil.escapeHtml(m)}">${TextUtil.escapeHtml(m)}</option>`).join("")
+        : `<option value="">${this.msg.noModel}</option>`;
+      if (models.includes(wanted)) select.value = wanted;
+      this.setPill("ok", this.msg.pillOk(models.length));
+      this.persist();
+      return models;
+    } catch (e) {
+      select.innerHTML = `<option value="">${this.msg.noModel}</option>`;
+      this.setPill("down", this.msg.pillDown);
+      throw e;
+    }
+  }
+  async testConnection() {
+    try {
+      const models = await this.loadModels();
+      this.setConnMsg("ok", this.msg.connOk(models.length));
+    } catch (e) {
+      this.setConnMsg("err", this.msg.connNg(e.message));
+    }
+  }
+  setConnMsg(state, text) {
+    this.el["conn-msg"].className = `msg ${state}`;
+    this.el["conn-msg"].textContent = text;
+  }
+  async detect() {
+    const d = USER_SETTINGS.detect;
+    this.el.detect.disabled = true;
+    this.setConnMsg("", this.msg.detecting);
+    const candidates = d.hosts.flatMap((h) => d.ports.map((p) => `${h}:${p}`));
+    const found = await Promise.any(candidates.map(async (url) => {
+      await new LlmClient(url).listModels(d.timeoutMs);
+      return url;
+    })).catch(() => null);
+    if (found) {
+      this.el.serverUrl.value = found;
+      this.persist();
+      this.setConnMsg("ok", this.msg.detectFound(found));
+      await this.loadModels().catch(() => {});
+    } else {
+      this.setConnMsg("err", this.msg.detectNone);
+    }
+    this.el.detect.disabled = false;
+  }
+
+  // PREVIEW
+  buildPreview() {
+    const cfg = this.readConfig();
+    const builder = new PromptBuilder(cfg.params, cfg.prompts);
+    const p = cfg.params;
+    const missing = !p.season || !p.costume || !p.keywords.length || !p.mood;
+    this.el["preview-system"].textContent = builder.system(false);
+    this.el["preview-generate"].textContent = builder.generate(Math.min(cfg.batchSize, cfg.count), [])
+      + (missing ? `\n\n${this.msg.previewNeedInputs}` : "");
+  }
+
+  // EXTERNAL PROMPT
+  buildExternal() {
+    const cfg = this.readConfig();
+    const p = cfg.params;
+    const missing = !p.season || !p.costume || !p.keywords.length || !p.mood;
+    return { text: new PromptBuilder(p, cfg.prompts).external(cfg.count), missing };
+  }
+  setExternalMsg(text, missing) {
+    this.el["external-msg"].className = `msg ${missing ? "err" : "ok"}`;
+    this.el["external-msg"].textContent = missing ? `${text}\n${this.msg.externalMissing}` : text;
+  }
+  async copyExternal() {
+    const { text, missing } = this.buildExternal();
+    await this.copyText(text);
+    this.setExternalMsg(this.msg.externalCopied, missing);
+  }
+  downloadExternal() {
+    const { text, missing } = this.buildExternal();
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name = this.msg.externalFileName(`${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`);
+    const url = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    this.setExternalMsg(this.msg.externalDownloaded(name), missing);
+  }
+
+  // RUN
+  readConfig() {
+    const v = this.values();
+    const lim = USER_SETTINGS.limits;
+    const def = USER_SETTINGS.defaults;
+    return {
+      model: this.el.model.value,
+      count: v.count,
+      maxRounds: TextUtil.clamp(parseInt(v.maxRounds, 10), lim.roundsMin, lim.roundsMax, def.maxRounds),
+      batchSize: TextUtil.clamp(parseInt(v.batchSize, 10), lim.batchMin, lim.batchMax, def.batchSize),
+      review: v.review,
+      temperature: TextUtil.clamp(parseFloat(v.temperature), lim.tempMin, lim.tempMax, def.temperature),
+      prompts: v.prompts,
+      params: {
+        season: v.season.trim(),
+        costume: v.costume.trim(),
+        keywords: TextUtil.splitList(v.keywords),
+        mood: v.mood.trim(),
+        ngWords: TextUtil.splitList(v.ngWords),
+        extraNote: v.extraNote.trim()
+      }
+    };
+  }
+  applyParams(p) {
+    ["season", "costume", "mood", "extraNote"].forEach((k) => {
+      if (typeof p[k] === "string") this.el[k].value = p[k];
+    });
+    if (p.keywords !== undefined) this.el.keywords.value = Array.isArray(p.keywords) ? p.keywords.join("、") : String(p.keywords);
+    if (Number.isFinite(p.count)) {
+      const c = USER_SETTINGS.countOptions;
+      this.el.count.value = String(TextUtil.clamp(Math.round(p.count), c.min, c.max, USER_SETTINGS.defaults.count));
+    }
+    if (typeof p.model === "string" && [...this.el.model.options].some((o) => o.value === p.model)) this.el.model.value = p.model;
+    this.autogrow(this.el.extraNote);
+    this.persist();
+  }
+  fail(text) {
+    this.setVerdict("ng", text);
+    return { error: text };
+  }
+  async run({ avoid = [], onProgress } = {}) {
+    if (this.controller) return { error: this.msg.busy };
+    const cfg = this.readConfig();
+    const p = cfg.params;
+    if (!cfg.model) return this.fail(this.msg.selectModel);
+    if (!p.season || !p.costume || !p.keywords.length || !p.mood) return this.fail(this.msg.needInputs);
+    this.el.log.textContent = "";
+    this.lastOk = [];
+    this.el["copy-all"].disabled = true;
+    this.setRunning(true);
+    this.setProgress(0, cfg.count);
+    this.controller = new AbortController();
+    const generator = new CopyGenerator({
+      client: new LlmClient(this.el.serverUrl.value),
+      model: cfg.model,
+      temperature: cfg.temperature,
+      params: p,
+      prompts: cfg.prompts,
+      count: cfg.count,
+      maxRounds: cfg.maxRounds,
+      batchSize: cfg.batchSize,
+      review: cfg.review,
+      avoid,
+      onLog: (t) => this.log(t),
+      onProgress: ({ accepted, failed, round, step }) => {
+        this.setVerdict("running", this.msg.running(accepted.length, cfg.count, round, step));
+        this.setProgress(accepted.length, cfg.count);
+        this.renderCopies(accepted, failed);
+        onProgress?.({ ok: accepted.length, total: cfg.count, round, step });
+      }
+    });
+    try {
+      const result = await generator.run(this.controller.signal);
+      this.lastOk = result.okList;
+      this.renderCopies(result.okList, result.ngList);
+      this.setProgress(result.okList.length, cfg.count);
+      this.setVerdict(result.allOk ? "ok" : "ng", result.allOk ? this.msg.verdictOk(cfg.count) : this.msg.verdictNg(result.okList.length, cfg.count));
+      this.el["copy-all"].disabled = !result.okList.length;
+      return { result, count: cfg.count };
+    } catch (e) {
+      const aborted = this.controller.signal.aborted;
+      const text = aborted ? this.msg.aborted : `${this.msg.errorPrefix}${e.message}`;
+      this.setVerdict("ng", text);
+      this.log(text);
+      return { error: text, aborted };
+    } finally {
+      this.setRunning(false);
+      this.controller = null;
+    }
+  }
+  setRunning(running) {
+    this.el.run.disabled = running;
+    this.el.cancel.hidden = !running;
+    this.el.progress.classList.toggle("busy", running);
+  }
+  setProgress(ok, total) {
+    this.el["progress-bar"].style.width = `${total ? (ok / total) * 100 : 0}%`;
+    this.el["progress-pct"].textContent = `${ok} / ${total}`;
+  }
+  setVerdict(state, text) {
+    this.verdictText = text;
+    this.el.verdict.dataset.state = state;
+    this.el.verdict.textContent = text;
+  }
+  log(text) {
+    const t = new Date().toLocaleTimeString("ja-JP");
+    this.el.log.textContent += `[${t}] ${text}\n`;
+    this.el.log.scrollTop = this.el.log.scrollHeight;
+  }
+  renderCopies(okList, ngList) {
+    const items = [...okList.map((r) => ({ ...r, ok: true })), ...ngList.map((r) => ({ ...r, ok: false }))];
+    this.el["copies-count"].textContent = this.msg.copiesCount(okList.length, items.length);
+    if (!items.length) {
+      this.el.copies.innerHTML = `<div class="empty">${this.msg.empty}</div>`;
+      return;
+    }
+    const minLen = USER_SETTINGS.rules.minLen;
+    this.el.copies.innerHTML = items.map((r, i) => `
+      <article class="copy" data-ok="${r.ok}">
+        <div class="copy-head">
+          <span class="copy-num">${this.msg.caseLabel(i + 1)}</span>
+          <span class="copy-badge">${r.ok ? this.msg.statusOk : this.msg.statusNg}</span>
+          <button class="small" data-copy="${i}">${this.msg.copy}</button>
+        </div>
+        ${r.lines.map((line, j) => `
+          <div class="copy-line">
+            <span class="len ${r.lengths[j] < minLen ? "bad" : ""}">${r.lengths[j]}${this.msg.lenUnit}</span>
+            <span class="copy-text">${TextUtil.escapeHtml(line)}</span>
+          </div>`).join("")}
+        ${r.errors.length ? `<ul class="copy-errors">${r.errors.map((e) => `<li>${TextUtil.escapeHtml(e)}</li>`).join("")}</ul>` : ""}
+      </article>`).join("");
+    this.el.copies.querySelectorAll("[data-copy]").forEach((btn) => {
+      btn.onclick = () => this.copyText(items[Number(btn.dataset.copy)].lines.join("\n"));
+    });
+  }
+  async copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    this.flash(this.msg.copied);
+  }
+  flash(text) {
+    clearTimeout(this.toastTimer);
+    this.el.verdict.textContent = `${this.verdictText}　✓ ${text}`;
+    this.toastTimer = setTimeout(() => { this.el.verdict.textContent = this.verdictText; }, USER_SETTINGS.toastMs);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const app = new App();
+  app.init();
+  window.addEventListener("pagehide", () => app.destroy(), { once: true });
+});
+</script>
+</body>
+</html>
