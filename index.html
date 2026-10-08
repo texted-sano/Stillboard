@@ -353,6 +353,7 @@ dialog#settings::backdrop { background: rgba(0, 0, 0, .55); }
           <button id="detect">🔍 自動で探す</button>
         </div>
         <div class="row"><button class="primary" id="test-conn">接続を確認</button><p class="msg" id="conn-msg"></p></div>
+        <p class="note" id="origin-note"></p>
       </div>
     </section>
 
@@ -476,6 +477,7 @@ const USER_SETTINGS = {
   },
   countOptions: { min: 1, max: 30 },
   limits: { roundsMin: 1, roundsMax: 30, batchMin: 1, batchMax: 30, tempMin: 0, tempMax: 2 },
+  connect: { timeoutMs: 20000, probeTimeoutMs: 3000, retryIntervalMs: 3000 },
   detect: {
     hosts: ["http://localhost", "http://127.0.0.1"],
     ports: [1234, 1235, 8080, 11434, 41343],
@@ -753,7 +755,16 @@ const USER_SETTINGS = {
     detectFound: (url) => `見つかりました：${url}`,
     detectNone: "見つかりませんでした。Bionic のローカルAPIサーバーと CORS がオンか、URL（ポート番号）を確認してください。",
     connOk: (n) => `🟢 接続できました（モデル ${n}件）`,
-    connNg: (e) => `🔴 接続できません（${e}）。サーバーが起動しているか、CORS がオンか、URL を確認してください。`,
+    connHint: "（右上の「設定」→「文章AI」で、接続先の確認・再接続ができます）",
+    conn: {
+      fileOrigin: "このファイル",
+      timeout: "🔴 文章AIから応答がありません。ブラウザに「ローカルネットワーク上のデバイスへのアクセス」の確認が出ていたら「許可」を押してください。許可すると、このページに戻ったときに自動でつなぎ直します。",
+      cors: (origin) => `🔴 Bionic には届いていますが、このページ（${origin}）からの接続が許可されていません。Bionic の「設定」→「ローカルモデルAPI」で「CORS」をオンにし、Bionic を再起動してから「接続を確認」を押してください。`,
+      http: (e) => `🔴 文章AIがエラーを返しました（${e}）。URL が正しいか確認してください。`,
+      down: "🔴 文章AIに届きません。次を確認してください。\n・Bionic の「ローカルAPIサーバー」がオンになっているか、URL（ポート番号）が正しいか\n・このページに「ローカルネットワークへのアクセス」を許可しているか（アドレスバー左のアイコン →「サイトの設定」→「ローカルネットワークへのアクセス」を「許可」）",
+      safari: "\n・Safari では、https のページ（GitHub Pages など）から接続できません。Chrome か Edge で開いてください"
+    },
+    originNote: (origin) => `設定はページを開いた場所ごとに別々に保存されます（いまの場所：${origin}）。ファイルで開いたときとGitHub Pagesで開いたときでは、URL・モデル・プロンプトの設定が共有されません。`,
     countOption: (n) => `${n}案`,
     selectModel: "文章AIのモデルを選んでください（モデルが出ないときは「設定」→「文章AI」で接続を確認）。",
     needInputs: "季節・時期、衣装、キーワード、雰囲気をすべて入力してください。",
@@ -871,6 +882,16 @@ class LlmClient {
   static normalize(url) {
     const trimmed = String(url || "").trim().replace(/\/+$/, "");
     return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  }
+  async diagnose(error) {
+    if (error?.name === "TimeoutError") return "timeout";
+    if (!(error instanceof TypeError)) return "http";
+    try {
+      await fetch(`${this.base}/models`, { mode: "no-cors", signal: AbortSignal.timeout(USER_SETTINGS.connect.probeTimeoutMs) });
+      return "cors";
+    } catch {
+      return "down";
+    }
   }
   async listModels(timeoutMs) {
     const signal = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
@@ -1403,7 +1424,7 @@ class App {
       "count", "run", "cancel", "progress", "progress-bar", "progress-pct", "verdict", "copies", "copies-count", "copy-all", "log",
       "serverUrl", "detect", "test-conn", "conn-msg", "prompt-system", "prompt-generate", "prompt-fix", "prompt-samples",
       "samples-count", "samples-skipped", "build-preview", "preview-system", "preview-generate", "temperature", "batchSize", "ngWords",
-      "copy-external", "download-external", "external-msg", "prompt-review", "review"
+      "copy-external", "download-external", "external-msg", "prompt-review", "review", "origin-note"
     ].forEach((id) => { this.el[id] = document.getElementById(id); });
     this.fields = ["serverUrl", "season", "costume", "keywords", "mood", "extraNote", "maxRounds", "temperature", "batchSize", "ngWords"];
     this.promptFields = { system: "prompt-system", generate: "prompt-generate", fix: "prompt-fix", review: "prompt-review", samples: "prompt-samples" };
@@ -1429,6 +1450,7 @@ class App {
     this.bind();
     this.autogrow(this.el.extraNote);
     this.updateSampleInfo();
+    this.el["origin-note"].textContent = this.msg.originNote(location.origin === "null" ? this.msg.conn.fileOrigin : location.origin);
     this.setVerdict("idle", this.msg.idle);
     this.renderCopies([], []);
     this.loadModels().catch(() => {}).finally(() => this.bridge.init());
@@ -1447,6 +1469,8 @@ class App {
     this.on(this.el["pill-llm"], "click", () => this.dialog.open("llm"));
     this.on(this.el["open-prompts"], "click", () => this.dialog.open("system"));
     this.on(this.el.detect, "click", () => this.detect());
+    this.on(window, "focus", () => this.retryOnReturn());
+    this.on(document, "visibilitychange", () => { if (!document.hidden) this.retryOnReturn(); });
     this.on(this.el["test-conn"], "click", () => this.testConnection());
     this.on(this.el["build-preview"], "click", () => this.buildPreview());
     this.on(this.el["copy-external"], "click", () => this.copyExternal());
@@ -1509,30 +1533,52 @@ class App {
   }
   async loadModels() {
     const select = this.el.model;
+    const client = new LlmClient(this.el.serverUrl.value);
+    this.lastConnTry = Date.now();
     this.setPill("idle", this.msg.pillChecking);
     try {
-      const models = await new LlmClient(this.el.serverUrl.value).listModels(USER_SETTINGS.detect.timeoutMs * 2);
+      const models = await client.listModels(USER_SETTINGS.connect.timeoutMs);
       const wanted = select.value || this.savedModel;
       select.innerHTML = models.length
         ? models.map((m) => `<option value="${TextUtil.escapeHtml(m)}">${TextUtil.escapeHtml(m)}</option>`).join("")
         : `<option value="">${this.msg.noModel}</option>`;
       if (models.includes(wanted)) select.value = wanted;
       this.setPill("ok", this.msg.pillOk(models.length));
+      this.connDown = false;
+      if (this.verdictIsConn && !this.controller) this.setVerdict("idle", this.msg.idle);
       this.persist();
       return models;
     } catch (e) {
       select.innerHTML = `<option value="">${this.msg.noModel}</option>`;
       this.setPill("down", this.msg.pillDown);
+      this.connDown = true;
+      const text = this.connErrorText(await client.diagnose(e), e);
+      this.setConnMsg("err", text);
+      if (!this.controller) {
+        this.setVerdict("ng", `${text}\n${this.msg.connHint}`);
+        this.verdictIsConn = true;
+      }
       throw e;
     }
+  }
+  connErrorText(reason, e) {
+    const m = this.msg.conn;
+    const origin = location.origin === "null" ? m.fileOrigin : location.origin;
+    const isSafari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent);
+    if (reason === "timeout") return m.timeout;
+    if (reason === "cors") return m.cors(origin);
+    if (reason === "http") return m.http(e.message);
+    return m.down + (isSafari && location.protocol === "https:" ? m.safari : "");
+  }
+  retryOnReturn() {
+    if (!this.connDown || this.controller || Date.now() - (this.lastConnTry || 0) < USER_SETTINGS.connect.retryIntervalMs) return;
+    this.loadModels().catch(() => {});
   }
   async testConnection() {
     try {
       const models = await this.loadModels();
       this.setConnMsg("ok", this.msg.connOk(models.length));
-    } catch (e) {
-      this.setConnMsg("err", this.msg.connNg(e.message));
-    }
+    } catch {}
   }
   setConnMsg(state, text) {
     this.el["conn-msg"].className = `msg ${state}`;
@@ -1701,6 +1747,7 @@ class App {
     this.el["progress-pct"].textContent = `${ok} / ${total}`;
   }
   setVerdict(state, text) {
+    this.verdictIsConn = false;
     this.verdictText = text;
     this.el.verdict.dataset.state = state;
     this.el.verdict.textContent = text;
